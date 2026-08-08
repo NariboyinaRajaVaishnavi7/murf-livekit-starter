@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { Track } from 'livekit-client';
 import { AnimatePresence, type MotionProps, motion } from 'motion/react';
 import { useAgent, useSessionContext, useSessionMessages } from '@livekit/components-react';
 import { AgentChatTranscript } from '@/components/agents-ui/agent-chat-transcript';
@@ -9,6 +10,7 @@ import {
   type AgentControlBarControls,
 } from '@/components/agents-ui/agent-control-bar';
 import { Shimmer } from '@/components/ai-elements/shimmer';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/shadcn/utils';
 import { TileLayout } from './tile-view';
 
@@ -177,9 +179,41 @@ export function AgentSessionView_01({
 }: React.ComponentProps<'section'> & AgentSessionView_01Props) {
   const session = useSessionContext();
   const { messages } = useSessionMessages(session);
+  // Detect if the latest message came from the AI assistant (non‑local)
+  const lastMessage = messages.at(-1);
+  const isAssistantMessage = lastMessage?.from?.isLocal === false;
+
   const [chatOpen, setChatOpen] = useState(false);
+
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const { state: agentState } = useAgent();
+
+
+
+  const { state: agentState } = useAgent(); // single declaration
+  const [micError, setMicError] = useState<string | undefined>(undefined);
+  const hadConnectedRef = useRef(false);
+
+  // speaking indicators (read flags directly to avoid calling hooks without a participant)
+  const localParticipant = (session?.local as any)?.participant;
+  const localIsSpeaking = Boolean((localParticipant as any)?.isSpeaking === true);
+  // pick first remote participant (assistant)
+  const remoteParticipant = (session?.room as any)?.remoteParticipants
+    ? Array.from((session.room as any).remoteParticipants.values())[0]
+    : undefined;
+  const remoteIsSpeaking = Boolean((remoteParticipant as any)?.isSpeaking === true);
+
+  // Show AI speaking UI for a short period after remote starts speaking
+
+
+  React.useEffect(() => {
+      console.log('Agent UI state:', {
+        sessionConnected: session?.isConnected,
+        agentState,
+        remoteIsSpeaking,
+        isAssistantMessage,
+      });
+  },
+  [session?.isConnected, agentState, remoteIsSpeaking, isAssistantMessage]);
 
   const controls: AgentControlBarControls = {
     leave: true,
@@ -198,12 +232,102 @@ export function AgentSessionView_01({
     }
   }, [messages]);
 
+  useEffect(() => {
+    if (session.isConnected) hadConnectedRef.current = true;
+  }, [session.isConnected]);
+
+  const handleDeviceError = ({ source, error }: { source: Track.Source; error: Error }) => {
+    if (source === Track.Source.Microphone) {
+      setMicError(error?.message ?? 'Microphone access denied');
+    }
+  };
+
+  const tryRequestMic = async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      setMicError(undefined);
+    } catch (err: any) {
+      setMicError(
+        'Microphone access is blocked. Please allow microphone access in your browser settings and try again.'
+      );
+    }
+  };
+
   return (
     <section
       ref={ref}
       className={cn('bg-background relative z-10 h-full w-full overflow-hidden', className)}
       {...props}
     >
+      {/* Header: title & subtitle (kept, but banner removed) */}
+      <div className="absolute inset-x-4 top-6 z-40 flex items-center justify-between">
+        <div className="flex flex-col">
+          <div className="text-xl font-bold">LearnMate AI</div>
+          <div className="text-muted-foreground text-sm">Your friendly AI voice tutor</div>
+        </div>
+      </div>
+
+
+
+
+        {/* Microphone permission error UI */}
+        {micError && (
+          <div className="flex flex-col items-center justify-center text-center px-4 py-12">
+            <div className="text-6xl font-bold text-red-600">🔇</div>
+            <h1 className="mt-4 text-3xl font-bold">MICROPHONE ACCESS REQUIRED</h1>
+            <p className="mt-2 text-muted-foreground">LearnMate AI needs microphone access to hear you.</p>
+            <p className="mt-2 text-muted-foreground">Please allow microphone access in your browser settings.</p>
+            <Button className="mt-6" onClick={tryRequestMic}>TRY AGAIN</Button>
+          </div>
+        )}
+
+{/* Central status screen – now the only place we show CONNECTING, LISTENING, SPEAKING, CALL ENDED, etc. */}
+      <div className="flex flex-1 flex-col items-center justify-center text-center px-4 py-12">
+        {(() => {
+          if (!session.isConnected) {
+            const cs = (session as any).connectionState;
+            if (cs === 'connecting' || cs === 'pre-connect-buffering') {
+              return (
+                <>
+                  <h1 className="text-5xl font-bold">CONNECTING...</h1>
+                  <p className="mt-2 text-muted-foreground">Connecting to your AI tutor. Please wait...</p>
+                  <div className="mt-6">
+                    <div className="h-2 w-24 bg-primary animate-pulse rounded-full"></div>
+                  </div>
+                </>
+              );
+            }
+            if (hadConnectedRef.current) {
+              return (
+                <>
+                  <h1 className="text-5xl font-bold">CALL ENDED</h1>
+                  <p className="mt-2 text-muted-foreground">Your learning session has ended.</p>
+                  <Button className="mt-4 w-48" onClick={() => (session.start as any)?.()}>
+                    START AGAIN
+                  </Button>
+                </>
+              );
+            }
+          }
+            if (agentState === 'speaking' || remoteIsSpeaking) {
+              return (
+                <div className="relative z-60 flex flex-col items-center justify-center">
+                  <div className="text-7xl animate-pulse">🔊</div>
+                  <h1 className="mt-2 text-5xl font-bold">AI IS SPEAKING</h1>
+                  <p className="mt-2 text-muted-foreground">Your AI tutor is responding...</p>
+                </div>
+              );
+            }
+          // Listening state
+          return (
+            <>
+              <div className="text-7xl">🎤</div>
+              <h1 className="mt-2 text-5xl font-bold">LISTENING</h1>
+              <p className="mt-2 text-muted-foreground">I'm listening to you...</p>
+            </>
+          );
+        })()}
+      </div>
       <Fade top className="absolute inset-x-4 top-0 z-10 h-40" />
       {/* transcript */}
 
@@ -266,9 +390,63 @@ export function AgentSessionView_01({
             isConnected={session.isConnected}
             onDisconnect={session.end}
             onIsChatOpenChange={setChatOpen}
+            onDeviceError={handleDeviceError}
           />
         </div>
       </motion.div>
+
+      {/* Microphone permission error overlay */}
+      {micError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-background mx-4 max-w-lg rounded-lg p-6 text-center">
+            <h3 className="text-lg font-bold">Microphone access blocked</h3>
+            <p className="text-muted-foreground mt-2 text-sm">
+              {micError}. To use LearnMate AI, enable your microphone in your browser settings and
+              refresh the page.
+            </p>
+            <div className="mt-4 flex justify-center gap-3">
+              <button
+                className="rounded-full bg-blue-600 px-4 py-2 text-white"
+                onClick={() => {
+                  tryRequestMic();
+                }}
+              >
+                Try Again
+              </button>
+              <button
+                className="rounded-full border px-4 py-2"
+                onClick={() => {
+                  setMicError(undefined);
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Call ended overlay with Start Again */}
+      {hadConnectedRef.current && !session.isConnected && (
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
+          <div className="bg-background/95 pointer-events-auto rounded-lg p-6 text-center shadow-lg">
+            <h3 className="text-xl font-bold">Call Ended</h3>
+            <p className="text-muted-foreground mt-2 text-sm">
+              Thanks for learning — start again anytime.
+            </p>
+            <div className="mt-4 flex justify-center gap-3">
+              <button
+                className="rounded-full bg-blue-600 px-4 py-2 text-white"
+                onClick={() => {
+                  (session.start as any)?.();
+                }}
+              >
+                Start Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

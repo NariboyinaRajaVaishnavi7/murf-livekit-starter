@@ -21,29 +21,48 @@ function WelcomeImage() {
 interface WelcomeViewProps {
   startButtonText: string;
   onStartCall: () => void;
+  isConnecting?: boolean;
 }
 
 export const WelcomeView = ({
   startButtonText,
   onStartCall,
   ref,
+  isConnecting = false,
 }: React.ComponentProps<'div'> & WelcomeViewProps) => {
   return (
     <div ref={ref}>
-      <section className="bg-background flex flex-col items-center justify-center text-center">
-        <WelcomeImage />
+      <section className="bg-background flex flex-col items-center justify-center px-4 py-12 text-center">
+        <div className="flex flex-col items-center gap-4">
+          <h1 className="text-3xl font-extrabold">LearnMate AI</h1>
+          <p className="text-muted-foreground text-lg">Your friendly AI voice tutor</p>
+          <WelcomeImage />
 
-        <p className="text-foreground max-w-prose pt-1 leading-6 font-medium">
-          Chat live with your voice AI agent
-        </p>
+          <p className="text-foreground max-w-prose pt-1 leading-6 font-medium">
+            Get personalised, voice-first tutoring for students across India.
+          </p>
 
-        <Button
-          size="lg"
-          onClick={onStartCall}
-          className="mt-6 w-64 rounded-full font-mono text-xs font-bold tracking-wider uppercase"
-        >
-          {startButtonText}
-        </Button>
+          <div className="mt-6">
+            {isConnecting ? (
+              <div className="flex w-64 items-center justify-center rounded-full bg-blue-600 py-3 font-sans text-base text-white">
+                Connecting...
+              </div>
+            ) : (
+              <Button
+                size="lg"
+                onClick={onStartCall}
+                className="w-64 rounded-full bg-blue-600 py-3 font-sans text-base text-white hover:bg-blue-700"
+              >
+                {startButtonText}
+              </Button>
+            )}
+            {isConnecting && (
+              <p className="text-muted-foreground mt-3 text-sm">
+                Connecting to your AI tutor. Please wait...
+              </p>
+            )}
+          </div>
+        </div>
       </section>
 
       <div className="fixed bottom-5 left-0 flex w-full items-center justify-center">

@@ -39,6 +39,12 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* LearnMate theme accents */
+:root {
+  --learnmate-accent: #0b69ff;
+  --learnmate-accent-2: #00b894;
+}
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -121,4 +127,18 @@
   body {
     @apply bg-background text-foreground;
   }
+
+/* header / status styles for LearnMate */
+.learnmate-header {
+  background: linear-gradient(90deg, rgba(11,105,255,0.06), rgba(0,184,148,0.04));
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.learnmate-status {
+  background: rgba(11,105,255,0.08);
+  color: var(--learnmate-accent);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
 }
