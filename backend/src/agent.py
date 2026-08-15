@@ -1,4 +1,6 @@
 import logging
+import json
+
 
 from dotenv import load_dotenv
 from livekit import rtc
@@ -8,17 +10,22 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     JobProcess,
+    RunContext,
     cli,
     inference,
     tokenize,
     room_io,
+    function_tool,
 )
 from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
+from memory import init_db,get_user,save_user
+from tools import get_next_exercise
 
 logger = logging.getLogger("agent")
 
 load_dotenv(".env.local")
+init_db()
 
 # Change this prompt to change what your voice agent does.
 # See README.md for example prompts (customer support, language tutor, receptionist).
@@ -86,10 +93,165 @@ IMPORTANT:
 Match the user's language, not your preferred language.
 English input → English response.
 Hindi input → Hindi response.
-Hinglish input → Hinglish response."""
+Hinglish input → Hinglish response.
+MEMORY WORKFLOW (STRICTLY ENFORCED)
+
+You have two memory tools:
+- lookup_user
+- save_user_memory
+
+AT THE VERY START OF THE CONVERSATION:
+- Proactively call lookup_user with the current user ID to check if this user exists in the database.
+
+FLOW A: RETURNING USER
+If lookup_user returns a saved user:
+
+1. Do NOT ask "What is your name?" or whether they have used the agent before.
+2. Greet the user directly by their saved name.
+3. Mention ONE relevant saved learning fact returned by lookup_user.
+4. Do not assume that the saved learning subject can never change.
+5. The user's latest confirmed learning subject is their current learning subject.
+
+FLOW B: NEW USER
+If lookup_user returns no saved user:
+
+1. Introduce yourself naturally and ask the user's name.
+2. After the user gives their name, ask:
+   "What are you currently learning?"
+3. When the user shares a useful learning fact such as
+   "I'm learning Java", ask for permission:
+   "Would you like me to remember that you're learning Java for our future conversations?"
+4. WAIT for the user's response.
+5. If the user clearly says YES:
+   - Call save_user_memory.
+   - Save the current learning subject as a structured fact.
+   - For example:
+     {"current_subject": "Java"}
+   - Only after the tool returns success, confirm that it has been remembered.
+6. If the user says NO:
+   - Do NOT call save_user_memory.
+   - Continue the conversation normally.
+
+UPDATING AN EXISTING LEARNING SUBJECT:
+- If a returning user says they have changed what they are currently learning, treat this as an update to their existing memory.
+- Example:
+  Saved memory: current_subject = Java
+  User says: "Now I want to learn Python."
+
+- Ask:
+  "Would you like me to update what I remember to Python?"
+
+- WAIT for the user's response.
+
+- If the user clearly says YES:
+  - Call save_user_memory.
+  - Save the new subject as:
+    {"current_subject": "Python"}
+  - This new subject replaces the previous current_subject.
+  - After successful saving, say that the memory has been updated.
+
+- If the user says NO:
+  - Do NOT call save_user_memory.
+  - Keep the previous memory unchanged.
+
+IMPORTANT MEMORY RULES:
+- The most recently confirmed current learning subject replaces the previous current learning subject.
+- Do not continue telling the user they are currently learning an old subject after they have confirmed a new subject.
+- Never invent a learning subject that was not returned by lookup_user or explicitly provided by the user.
+- Never expose raw JSON, database information, or internal tool details to the user.
+LEARNING EXERCISE TOOL
+
+You have access to a learning exercise tool called learning_exercise.
+
+Use this tool when the student asks for:
+- a practice question
+- an exercise
+- a quiz question
+- something to practice
+
+The tool requires:
+- subject
+- topic
+- difficulty level
+
+If the student provides these details, use them.
+
+If the student does not provide a difficulty level,
+ask them whether they want beginner, intermediate, or advanced.
+
+Do not invent an exercise when the tool can provide one.
+
+When the tool returns an exercise:
+- Present the question naturally.
+- Do not read raw JSON.
+- Do not mention internal tool calls.
+- Do not mention the database.
+
+If the tool fails or no matching exercise is found:
+- Tell the student that the exercise library is currently unavailable.
+- Do not invent a replacement exercise.
+"""
+
+
+@function_tool
+async def lookup_user(context:RunContext,user_id: str):
+    """Look up a returning learner by their user ID."""
+
+    user = get_user(user_id)
+
+    if user is None:
+        return "No saved information was found for this user."
+
+    return json.dumps(user)
+
+
+@function_tool
+async def save_user_memory(
+    context:RunContext,
+    user_id: str,
+    name: str,
+    language_preference: str,
+    facts: str,
+):
+    """Save learner information after the user gives permission."""
+
+    save_user(
+        user_id=user_id,
+        name=name,
+        language_preference=language_preference,
+        facts=facts,
+    )
+
+    return "The user's information has been saved successfully."
+@function_tool
+async def learning_exercise(
+    context: RunContext,
+    subject: str,
+    topic: str,
+    level: str,
+):
+    """
+    Fetch a learning exercise for the student.
+
+    Use this tool when the student asks for a practice question,
+    exercise, or quiz question.
+
+    The exercise is selected using the student's subject,
+    topic, and difficulty level.
+
+    Do not invent an exercise when this tool can provide one.
+    """
+
+    result = get_next_exercise(
+        subject,
+        topic,
+        level
+    )
+
+    return json.dumps(result)
 class Assistant(Agent):
     def __init__(self) -> None:
-        super().__init__(instructions=SYSTEM_PROMPT)
+        super().__init__(instructions=SYSTEM_PROMPT,tools=[lookup_user,save_user_memory,learning_exercise],)
 
     # To add tools, use the @function_tool decorator.
     # Here's an example that adds a simple weather tool.

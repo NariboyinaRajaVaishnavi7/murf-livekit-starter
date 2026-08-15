@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { AnimatePresence, motion } from 'motion/react';
 import { useSessionContext } from '@livekit/components-react';
@@ -38,23 +39,44 @@ export function ViewController({ appConfig }: ViewControllerProps) {
     connectionState === 'connecting' || connectionState === 'pre-connect-buffering';
   const { resolvedTheme } = useTheme();
 
+  const [hasEndedSession, setHasEndedSession] = useState(false);
+  const wasConnectedRef = useRef(false);
+
+  if (isConnected && !wasConnectedRef.current) {
+    wasConnectedRef.current = true;
+  }
+
+  const showSessionView = isConnected || hasEndedSession || (wasConnectedRef.current && !isConnected);
+
+  const handleCloseSessionEnded = () => {
+    wasConnectedRef.current = false;
+    setHasEndedSession(false);
+  };
+
+  const handleStartCall = () => {
+    wasConnectedRef.current = false;
+    setHasEndedSession(false);
+    start();
+  };
+
   return (
     <AnimatePresence mode="wait">
       {/* Welcome view */}
-      {!isConnected && (
+      {!showSessionView && (
         <MotionWelcomeView
           key="welcome"
           {...VIEW_MOTION_PROPS}
           startButtonText={appConfig.startButtonText}
-          onStartCall={start}
+          onStartCall={handleStartCall}
           isConnecting={isConnecting}
         />
       )}
       {/* Session view */}
-      {isConnected && (
+      {showSessionView && (
         <MotionSessionView
           key="session-view"
           {...VIEW_MOTION_PROPS}
+          onClose={handleCloseSessionEnded}
           supportsChatInput={appConfig.supportsChatInput}
           supportsVideoInput={appConfig.supportsVideoInput}
           supportsScreenShare={appConfig.supportsScreenShare}

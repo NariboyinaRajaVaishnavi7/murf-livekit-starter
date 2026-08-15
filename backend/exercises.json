@@ -1,0 +1,42 @@
+[
+    {
+        "id": 1,
+        "subject": "Java",
+        "topic": "Arrays",
+        "level": "Beginner",
+        "question": "What is the index of the first element in a Java array?",
+        "answer": "The index of the first element is 0."
+    },
+    {
+        "id": 2,
+        "subject": "Java",
+        "topic": "Arrays",
+        "level": "Beginner",
+        "question": "If int[] arr = {10, 20, 30}, what is the value of arr[1]?",
+        "answer": "The value of arr[1] is 20."
+    },
+    {
+        "id": 3,
+        "subject": "Java",
+        "topic": "Loops",
+        "level": "Beginner",
+        "question": "Which loop is commonly used when you know how many times you want to repeat something in Java?",
+        "answer": "The for loop."
+    },
+    {
+        "id": 4,
+        "subject": "Python",
+        "topic": "Lists",
+        "level": "Beginner",
+        "question": "What method is used to add an item to the end of a Python list?",
+        "answer": "The append method."
+    },
+    {
+        "id": 5,
+        "subject": "Python",
+        "topic": "Variables",
+        "level": "Beginner",
+        "question": "How do you create a variable called age with the value 20 in Python?",
+        "answer": "You write age = 20."
+    }
+]

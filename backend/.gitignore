@@ -1,9 +1,13 @@
 .env
+.env.local
 .env.*
 !.env.example
 .DS_Store
-__pycache__
+*.db
+__pycache__/
+node_modules/
 .idea
+
 KMS
 .venv
 .vscode

@@ -276,3 +276,36 @@ For deeper documentation on each part, see:
 ## License
 
 MIT
+## Day 5 – The Tools
+
+### Learning Exercise Tool
+
+The Learning & Literacy voice agent now has a tool called
+`learning_exercise`.
+
+It provides practice questions based on:
+
+- Subject
+- Topic
+- Difficulty level
+
+For example, when the user asks:
+
+> "Give me a beginner Java arrays practice question."
+
+the agent automatically calls the `learning_exercise` tool and
+retrieves a matching exercise.
+
+### Data Source
+
+**Data source:** Local hand-built learning exercise dataset.
+
+**Data type:** Static/local data, not a live external API.
+
+The exercises are currently stored in `exercises.json`.
+
+### Failure Handling
+
+If the exercise library is unavailable or no matching exercise
+is found, the agent informs the user instead of inventing an
+exercise.
